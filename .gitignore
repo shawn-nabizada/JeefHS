@@ -9,7 +9,7 @@ __pycache__/
 *.zip
 *.tar
 *.gz
-* .jsonl
+*.jsonl
 .DS_Store
 config.json
 
