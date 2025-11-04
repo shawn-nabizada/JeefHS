@@ -1,6 +1,6 @@
 # JeefHS
 
-[Demo video (YouTube)](https://youtube.com/placeholder)
+[Demo video (YouTube)](https://youtu.be/M_X60AuhMnQ?si=Q_FRKQtvKjA0x56r)
 
 ## Table of contents
 - [Overview](#overview)
