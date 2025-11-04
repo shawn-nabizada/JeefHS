@@ -1,0 +1,14 @@
+env/
+__pycache__/
+*.pyc
+*.log
+*.jpg
+*.jpeg
+*.png
+*.mp4
+*.zip
+*.tar
+*.gz
+.DS_Store
+config.json
+

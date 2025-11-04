@@ -1,0 +1,61 @@
+{
+  "ADAFRUIT_IO_USERNAME": "XYZ",
+  "ADAFRUIT_IO_KEY": "XYZ",
+  "MQTT_BROKER": "io.adafruit.com",
+  "MQTT_PORT": 1883,
+  "MQTT_KEEPALIVE": 60,
+  "use_tls": false,
+
+  "ENV_FEEDS": {
+    "temperature": "temperature",
+    "humidity": "humidity"
+  },
+  "SECURITY_FEEDS": {
+    "motion_count": "motion_feed"
+  },
+
+  "security_check_interval": 5,
+  "security_send_interval": 60,
+  "env_interval": 30,
+  "flushing_interval": 10,
+
+  "camera_enabled": true,
+  "image_dir": "captured_images",
+  "alert_cooldown_s": 300,
+
+  "env_sensor": "DHT22",
+  "use_dht": true,
+
+  "devices": ["living_room_light", "bedroom_fan", "front_door", "garage_door"],
+
+  "PINS": {
+    "pir": "D6",
+    "dht": "D4",
+    "red_led": "D13",
+    "green_led": "D19",
+    "blue_led": "D26",
+    "fan": "D21",
+    "buzzer": "D5"
+  },
+
+  "CONTROL_FEEDS": {
+    "party_mode": "party_mode_control",
+    "buzzer": "buzzer_control",
+    "fan": "fan_control",
+    "mode": "mode_select"
+  },
+
+  "STATUS_FEEDS": {
+    "mode": "mode_status"
+  },
+
+  "HEARTBEAT_FEED": "pi_heartbeat",
+  "heartbeat_interval": 30,
+
+  "SMTP_HOST": "smtp-relay.brevo.com",
+  "SMTP_PORT": 587,
+  "SMTP_USER": "XYZ",
+  "SMTP_PASS": "XYZ",
+  "ALERT_FROM": "XYZ",
+  "ALERT_TO": "XYZ"
+}
