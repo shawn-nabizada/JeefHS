@@ -1,5 +1,7 @@
 # JeefHS
 
+[Demo video (YouTube)](https://youtube.com/placeholder)
+
 ## Table of contents
 - [Overview](#overview)
 - [Quick start](#quick-start)
@@ -7,6 +9,7 @@
 - [Project structure (files & purpose)](#project-structure-files--purpose)
 - [How it works (module responsibilities)](#how-it-works-module-responsibilities)
 - [Contract (inputs/outputs)](#contract-inputsoutputs)
+- [What we learned](#what-we-learned)
 
 ## Overview
 
