@@ -1,4 +1,4 @@
-# JeefHS
+# Jeef Home Security (JeefHS)
 
 [Demo video (YouTube)](https://youtu.be/M_X60AuhMnQ?si=Q_FRKQtvKjA0x56r)
 
