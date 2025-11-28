@@ -15,22 +15,28 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 
-import board
-import digitalio
-from picamera2 import Picamera2
-import cv2
+from dotenv import load_dotenv  # NEW: For loading secrets
+
+try:
+    import board
+    import digitalio
+except ImportError:
+    board = None
+    digitalio = None
+
+try:
+    from picamera2 import Picamera2
+    import cv2
+except ImportError:
+    Picamera2 = None
+    cv2 = None
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
 def resolve_pin(pin_spec):
-    """
-    Resolve a pin spec from config into an object usable by Blinka/Adafruit libs.
-    - "D6"      -> getattr(board, "D6")
-    - "BCM:17"  -> int(17)  (for libs that accept BCM integers)
-    - 17        -> 17
-    """
     if pin_spec is None:
         return None
     if isinstance(pin_spec, int):
@@ -39,26 +45,21 @@ def resolve_pin(pin_spec):
         if pin_spec.upper().startswith("BCM:"):
             return int(pin_spec.split(":", 1)[1])
         try:
-            return getattr(board, pin_spec)
+            if board:
+                return getattr(board, pin_spec)
         except AttributeError:
-            raise RuntimeError(f"Unknown board pin '{pin_spec}' (check config).")
+            raise RuntimeError(f"Unknown board pin '{pin_spec}'")
     raise TypeError(f"Unsupported pin spec type: {type(pin_spec)}")
 
 
 class security_module:
     """
-    Reads a PIR motion sensor and, on motion, captures an image and emails an alert via Brevo SMTP.
-    Requires a valid config.json (no built-in defaults).
+    Reads a PIR motion sensor and, on motion, captures an image and emails an alert.
+    Uses .env for SMTP credentials.
     """
 
-    REQUIRED_KEYS = [
-        # Email (Brevo)
-        "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "ALERT_FROM", "ALERT_TO",
-        # Behavior
-        "camera_enabled", "image_dir", "alert_cooldown_s",
-        # Pins block
-        "PINS"
-    ]
+    # We now check config logic slightly differently because SMTP keys come from env
+    REQUIRED_PINS = ["pir"]
 
     def __init__(
         self,
@@ -67,32 +68,34 @@ class security_module:
         buzzer_callback: Optional[Callable[[], None]] = None,
     ):
         self.config = self._load_config(config_file)
-        self._validate_required(self.REQUIRED_KEYS, self.config)
-        self._validate_required(["pir"], self.config.get("PINS", {}))
+        self._validate_pins(self.config.get("PINS", {}))
 
         self._mode_getter = mode_getter or (lambda: "HOME")
         self._buzzer_callback = buzzer_callback
 
         # Resolve PIR pin
-        pir_pin = resolve_pin(self.config["PINS"]["pir"])
-        if pir_pin is None:
-            raise RuntimeError("PINS.pir must be set in config.json")
-
-        # Setup PIR (HIGH when motion)
-        self.pir = digitalio.DigitalInOut(pir_pin)
-        self.pir.direction = digitalio.Direction.INPUT
+        if board and digitalio:
+            pir_pin = resolve_pin(self.config["PINS"]["pir"])
+            self.pir = digitalio.DigitalInOut(pir_pin)
+            self.pir.direction = digitalio.Direction.INPUT
+        else:
+            logger.warning("GPIO not available; Security module in simulation mode.")
+            self.pir = None
 
         # Camera
-        self.image_dir = self.config["image_dir"]
+        self.image_dir = self.config.get("image_dir", "captured_images")
         os.makedirs(self.image_dir, exist_ok=True)
 
-        self.picam2 = Picamera2()
-        try:
-            cfg = self.picam2.create_still_configuration()
-            self.picam2.configure(cfg)
-        except Exception as e:
-            logger.warning(f"Picamera2 still config failed: {e}")
-        self.picam2.start()
+        self.picam2 = None
+        if self.config.get("camera_enabled") and Picamera2:
+            try:
+                self.picam2 = Picamera2()
+                cfg = self.picam2.create_still_configuration()
+                self.picam2.configure(cfg)
+                self.picam2.start()
+                logger.info("Picamera2 initialized.")
+            except Exception as e:
+                logger.warning(f"Picamera2 init failed: {e}")
 
         # Per-alert-type cooldown tracker
         self._last_alert_time = {}
@@ -101,35 +104,58 @@ class security_module:
 
     @staticmethod
     def _load_config(path: str) -> dict:
+        """Load JSON and inject SMTP secrets from .env"""
+        load_dotenv()
+        
         try:
             with open(path, "r") as f:
-                return json.load(f)
+                cfg = json.load(f)
         except FileNotFoundError:
-            raise RuntimeError(f"Missing {path}. Provide a valid configuration file (no defaults in code).")
+            raise RuntimeError(f"Missing {path}")
         except json.JSONDecodeError as e:
             raise RuntimeError(f"Invalid JSON in {path}: {e}")
 
-    @staticmethod
-    def _validate_required(required_keys, cfg: dict):
-        missing = [k for k in required_keys if k not in cfg]
-        if missing:
-            raise RuntimeError(f"Config missing required keys: {', '.join(missing)}")
+        # Inject SMTP Secrets from ENV (Safe fallback to config.json if not in env)
+        cfg["SMTP_HOST"] = os.getenv("SMTP_HOST", cfg.get("SMTP_HOST"))
+        cfg["SMTP_PORT"] = int(os.getenv("SMTP_PORT", cfg.get("SMTP_PORT", 587)))
+        cfg["SMTP_USER"] = os.getenv("SMTP_USER", cfg.get("SMTP_USER"))
+        cfg["SMTP_PASS"] = os.getenv("SMTP_PASS", cfg.get("SMTP_PASS"))
+        cfg["ALERT_FROM"] = os.getenv("ALERT_FROM", cfg.get("ALERT_FROM"))
+        cfg["ALERT_TO"] = os.getenv("ALERT_TO", cfg.get("ALERT_TO"))
+
+        # Basic validation that we have credentials
+        if not cfg["SMTP_USER"] or not cfg["SMTP_PASS"]:
+            logger.warning("SMTP Credentials missing in .env; Email alerts will fail.")
+
+        return cfg
+
+    def _validate_pins(self, pins_cfg):
+        if "pir" not in pins_cfg:
+            raise RuntimeError("PINS.pir must be set in config.json")
 
     # -------------------- main API --------------------
 
     def get_security_data(self) -> dict:
-        motion_detected = bool(self.pir.value)
+        # Read Hardware or Simulate
+        if self.pir:
+            motion_detected = bool(self.pir.value)
+        else:
+            motion_detected = False # Or simulate random motion for testing
+
         mode = (self._mode_getter() or "HOME").upper()
-
         buzzer_triggered = False
-
         image_path = None
+
         if motion_detected:
-            if self.config["camera_enabled"]:
+            # Capture Image
+            if self.config.get("camera_enabled"):
                 image_path = self._capture_image()
+            
+            # Pulse Buzzer if AWAY
             if self._mode_allows_buzzer(mode):
                 buzzer_triggered = self._pulse_buzzer()
 
+            # Send Email
             self._send_email_alert(
                 alert_type="Motion Detected",
                 message="Motion sensor triggered.",
@@ -155,13 +181,20 @@ class security_module:
         try:
             self._buzzer_callback()
             return True
-        except Exception as exc:  # pragma: no cover - hardware failure path
+        except Exception as exc:
             logger.warning("Failed to pulse buzzer: %s", exc)
             return False
 
     def _capture_image(self) -> str:
-        """Capture an image; fall back to a small text file if capture fails."""
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # If camera not initialized, just write a text placeholder
+        if not self.picam2 or not cv2:
+            out_txt = os.path.join(self.image_dir, f"motion_{ts}_placeholder.txt")
+            with open(out_txt, "w") as f:
+                f.write(f"Motion detected at {datetime.now().isoformat()} (Camera Unavailable)")
+            return out_txt
+
         out_jpg = os.path.join(self.image_dir, f"motion_{ts}.jpg")
         try:
             frame = self.picam2.capture_array()
@@ -169,46 +202,36 @@ class security_module:
             logger.info(f"Image captured: {out_jpg}")
             return out_jpg
         except Exception as e:
-            logger.warning(f"Camera capture failed ({e}); writing placeholder")
-            out_txt = os.path.join(self.image_dir, f"motion_{ts}.txt")
-            with open(out_txt, "w") as f:
-                f.write(f"Motion detected at {datetime.now().isoformat()}")
-            return out_txt
+            logger.warning(f"Camera capture failed ({e})")
+            return None
 
     def _send_email_alert(self, alert_type: str, message: str = "", image_path: str | None = None) -> bool:
-        """Send via Brevo SMTP with cooldown enforcement."""
-        cooldown = int(self.config["alert_cooldown_s"])
+        """Send via SMTP with cooldown."""
+        cooldown = int(self.config.get("alert_cooldown_s", 300))
         now = time.time()
         last = self._last_alert_time.get(alert_type, 0.0)
+        
         if now - last < cooldown:
-            remain = int(cooldown - (now - last))
-            logger.info(f"Suppressing '{alert_type}' (cooldown {remain}s left)")
             return False
 
-        smtp_host = self.config["SMTP_HOST"]
-        smtp_port = int(self.config["SMTP_PORT"])
-        smtp_user = self.config["SMTP_USER"]
-        smtp_pass = self.config["SMTP_PASS"]
-        sender = self.config["ALERT_FROM"]
-        recipient = self.config["ALERT_TO"]
+        if not self.config.get("SMTP_HOST") or not self.config.get("SMTP_USER"):
+            return False
 
         try:
             msg = MIMEMultipart()
-            msg["From"] = sender
-            msg["To"] = recipient
+            msg["From"] = self.config["ALERT_FROM"]
+            msg["To"] = self.config["ALERT_TO"]
             msg["Subject"] = f"🚨 JeefHS Alert: {alert_type}"
 
             body = (
-                "JeefHS Security Alert\n\n"
-                f"Alert Type: {alert_type}\n"
+                f"JeefHS Security Alert\n\n"
+                f"Type: {alert_type}\n"
                 f"Time: {datetime.now():%Y-%m-%d %H:%M:%S}\n"
-                "Location: Home Security System\n\n"
-                f"{message}\n\n"
-                "---\nThis is an automated alert from your JeefHS IoT system."
+                f"{message}\n"
             )
             msg.attach(MIMEText(body, "plain"))
 
-            if image_path and Path(image_path).exists():
+            if image_path and Path(image_path).exists() and image_path.endswith(".jpg"):
                 try:
                     with open(image_path, "rb") as f:
                         part = MIMEImage(f.read())
@@ -218,26 +241,27 @@ class security_module:
                     logger.warning(f"Failed attaching image: {e}")
 
             context = ssl.create_default_context()
-            with smtplib.SMTP(smtp_host, smtp_port) as server:
+            with smtplib.SMTP(self.config["SMTP_HOST"], self.config["SMTP_PORT"]) as server:
                 server.starttls(context=context)
-                server.login(smtp_user, smtp_pass)
+                server.login(self.config["SMTP_USER"], self.config["SMTP_PASS"])
                 server.send_message(msg)
 
             self._last_alert_time[alert_type] = now
-            logger.info(f"Email alert sent via Brevo: {alert_type}")
+            logger.info(f"Email alert sent: {alert_type}")
             return True
 
         except Exception as e:
-            logger.error(f"Brevo SMTP send failed: {e}", exc_info=True)
+            logger.error(f"SMTP send failed: {e}")
             return False
 
     def close(self):
-        """Cleanup camera resources."""
-        try:
-            self.picam2.stop()
-        except Exception:
-            pass
-        try:
-            cv2.destroyAllWindows()
-        except Exception:
-            pass
+        if self.picam2:
+            try:
+                self.picam2.stop()
+            except Exception:
+                pass
+        if cv2:
+            try:
+                cv2.destroyAllWindows()
+            except Exception:
+                pass

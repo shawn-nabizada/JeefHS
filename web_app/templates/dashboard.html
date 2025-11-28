@@ -1,0 +1,51 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="row text-center">
+    <div class="col-md-12 mb-4">
+        <h1 class="display-4">System Overview</h1>
+        <p class="text-muted">Last Update: {{ last_update }}</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Temperature Card -->
+    <div class="col-md-4">
+        <div class="card text-white bg-danger mb-3">
+            <div class="card-header">Temperature</div>
+            <div class="card-body">
+                <h2 class="card-title">{{ temp }} &deg;C</h2>
+            </div>
+        </div>
+    </div>
+    <!-- Humidity Card -->
+    <div class="col-md-4">
+        <div class="card text-white bg-primary mb-3">
+            <div class="card-header">Humidity</div>
+            <div class="card-body">
+                <h2 class="card-title">{{ humid }} %</h2>
+            </div>
+        </div>
+    </div>
+    <!-- Mode Card -->
+    <div class="col-md-4">
+        <div class="card text-white bg-success mb-3">
+            <div class="card-header">Current Mode</div>
+            <div class="card-body">
+                <h2 class="card-title">{{ mode }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Quick Actions</h5>
+                <a href="/devices" class="btn btn-outline-dark w-100 mb-2">Control Devices</a>
+                <a href="/security" class="btn btn-outline-dark w-100">Manage Security</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

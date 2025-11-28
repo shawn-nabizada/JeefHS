@@ -1,0 +1,46 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2>Device Control</h2>
+<div class="row">
+    <!-- Fan Control -->
+    <div class="col-md-4">
+        <div class="card text-center mb-3">
+            <div class="card-header">Bedroom Fan</div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="device" value="fan">
+                    <button name="state" value="ON" class="btn btn-success w-40">ON</button>
+                    <button name="state" value="OFF" class="btn btn-danger w-40">OFF</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Buzzer Control -->
+    <div class="col-md-4">
+        <div class="card text-center mb-3">
+            <div class="card-header">Buzzer (Alert)</div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="device" value="buzzer">
+                    <button name="state" value="ON" class="btn btn-warning w-100">TRIGGER PULSE</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Party Mode Control -->
+    <div class="col-md-4">
+        <div class="card text-center mb-3">
+            <div class="card-header">Party Mode (LEDs)</div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="device" value="party">
+                    <button name="state" value="ON" class="btn btn-primary w-40">START</button>
+                    <button name="state" value="OFF" class="btn btn-dark w-40">STOP</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

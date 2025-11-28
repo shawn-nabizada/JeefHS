@@ -4,8 +4,10 @@
 import json
 import logging
 import ssl
+import os
 from typing import Callable, Dict, Optional
 
+from dotenv import load_dotenv  # NEW: For loading secrets
 import paho.mqtt.client as mqtt
 
 # Configure logging
@@ -30,33 +32,40 @@ class MQTT_communicator:
         self.setup_mqtt()
 
     def load_config(self, config_file):
-        """Load configuration from JSON file"""
+        """Load configuration from JSON and inject secrets from .env"""
+        load_dotenv()  # Load .env variables
+
         default_config = {
-            "ADAFRUIT_IO_USERNAME": "username",
-            "ADAFRUIT_IO_KEY": "userkey",
             "MQTT_BROKER": "io.adafruit.com",
-            # NOTE: port can be overridden by config; see setup_mqtt for TLS-aware default
             "MQTT_PORT": 1883,
             "MQTT_KEEPALIVE": 60,
-            "devices": ["living_room_light", "bedroom_fan", "front_door", "garage_door"],
-            "camera_enabled": True,
-            "capturing_interval": 900,
-            "flushing_interval": 10,
-            "sync_interval": 300,
-            # NEW: toggle TLS for MQTT
             "use_tls": False
         }
 
         try:
             with open(config_file, 'r') as f:
-                config = json.load(f)
-                return {**default_config, **config}
+                json_config = json.load(f)
         except FileNotFoundError:
             logger.warning(f"Config file {config_file} not found, using defaults")
-            return default_config
+            json_config = {}
+
+        # Merge Defaults + JSON
+        config = {**default_config, **json_config}
+
+        # Inject Credentials from ENV (Overrides JSON)
+        if os.getenv("ADAFRUIT_IO_USERNAME"):
+            config["ADAFRUIT_IO_USERNAME"] = os.getenv("ADAFRUIT_IO_USERNAME")
+        if os.getenv("ADAFRUIT_IO_KEY"):
+            config["ADAFRUIT_IO_KEY"] = os.getenv("ADAFRUIT_IO_KEY")
+
+        return config
 
     def setup_mqtt(self):
         """Setup MQTT client for Adafruit IO (with optional TLS)"""
+        if not self.config.get("ADAFRUIT_IO_USERNAME") or not self.config.get("ADAFRUIT_IO_KEY"):
+            logger.error("Missing Adafruit IO credentials in .env or config.json")
+            return
+
         try:
             self.mqtt_client = mqtt.Client()
 
@@ -75,12 +84,9 @@ class MQTT_communicator:
             # TLS (optional)
             use_tls = bool(self.config.get("use_tls", False))
             if use_tls:
-                # Use system CA certificates; set TLS context
                 self.mqtt_client.tls_set(context=ssl.create_default_context())
-                # If no explicit port provided, default to 8883 for TLS
                 port = int(self.config.get("MQTT_PORT", 8883))
             else:
-                # Non-TLS default 1883 unless overridden
                 port = int(self.config.get("MQTT_PORT", 1883))
 
             # Connect to broker
@@ -99,7 +105,6 @@ class MQTT_communicator:
             self.mqtt_connected = False
 
     def on_mqtt_connect(self, client, userdata, flags, rc):
-        """Callback for when MQTT client connects"""
         if rc == 0:
             self.mqtt_connected = True
             logger.info("Connected to MQTT broker")
@@ -109,7 +114,6 @@ class MQTT_communicator:
             logger.error(f"Failed to connect to MQTT broker, return code {rc}")
 
     def on_mqtt_disconnect(self, client, userdata, rc):
-        """Callback for when MQTT client disconnects"""
         self.mqtt_connected = False
         if rc != 0:
             logger.warning(f"Unexpected disconnection from MQTT broker (rc={rc})")
@@ -117,11 +121,9 @@ class MQTT_communicator:
             logger.info("Disconnected from MQTT broker")
 
     def on_mqtt_publish(self, client, userdata, mid):
-        """Callback for when message is published"""
         logger.debug(f"Message {mid} published successfully")
 
     def on_mqtt_message(self, client, userdata, message):
-        """Handle inbound control messages from Adafruit IO."""
         try:
             payload = message.payload.decode("utf-8").strip()
         except UnicodeDecodeError:
@@ -135,27 +137,20 @@ class MQTT_communicator:
             return
 
         if device_or_mode == "mode":
-            if self._on_set_mode is None:
-                logger.warning("Mode control received but no handler registered")
-                return
-            try:
-                self._on_set_mode(payload)
-            except ValueError as exc:
-                logger.warning("Rejected mode command '%s': %s", payload, exc)
-            except Exception as exc:  # pragma: no cover - defensive logging
-                logger.exception("Mode control handler failed: %s", exc)
+            if self._on_set_mode:
+                try:
+                    self._on_set_mode(payload)
+                except Exception as exc:
+                    logger.warning("Mode control handler failed: %s", exc)
             return
 
         desired_state = payload.upper() in {"ON", "1", "TRUE", "HIGH"}
-        if self._on_set_device_state is None:
-            logger.warning("Device control received for %s but no handler registered", device_or_mode)
-            return
-        try:
-            self._on_set_device_state(device_or_mode, desired_state)
-        except Exception as exc:  # pragma: no cover - defensive logging
-            logger.exception("Device control handler failed for %s: %s", device_or_mode, exc)
+        if self._on_set_device_state:
+            try:
+                self._on_set_device_state(device_or_mode, desired_state)
+            except Exception as exc:
+                logger.exception("Device control handler failed for %s: %s", device_or_mode, exc)
 
-    # Send data to Adafruit IO
     def send_to_adafruit_io(self, feed_name, value):
         if not self.mqtt_client or not self.mqtt_connected:
             logger.warning("MQTT client not connected")
@@ -175,7 +170,6 @@ class MQTT_communicator:
             logger.error(f"Error publishing to MQTT: {e}")
             return False
 
-    # Optional: call when shutting down your app
     def close(self):
         try:
             if self.mqtt_client is not None:
@@ -184,9 +178,6 @@ class MQTT_communicator:
         except Exception:
             pass
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
     def _subscribe_control_feeds(self) -> None:
         if not self.mqtt_client or not self.control_feeds:
             return
@@ -196,5 +187,5 @@ class MQTT_communicator:
             result, _ = self.mqtt_client.subscribe(topic)
             if result == mqtt.MQTT_ERR_SUCCESS:
                 logger.info("Subscribed to control feed %s (%s)", feed, device)
-            else:  # pragma: no cover - network failure path
+            else:
                 logger.warning("Failed to subscribe to %s (code %s)", topic, result)

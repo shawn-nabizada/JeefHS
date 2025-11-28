@@ -1,0 +1,61 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2>Environmental Data</h2>
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="POST" class="row g-3 align-items-center">
+            <div class="col-auto">
+                <label for="date" class="col-form-label">Select Date:</label>
+            </div>
+            <div class="col-auto">
+                <input type="date" id="date" name="date" class="form-control" value="{{ selected_date }}" required>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary">Load Data</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <canvas id="envChart"></canvas>
+    </div>
+</div>
+
+<script>
+    const rawData = {{ data | tojson }};
+    if (rawData.length === 0) {
+        document.getElementById('envChart').insertAdjacentHTML('beforebegin', '<div class="alert alert-warning">No data found for this date.</div>');
+    } else {
+        const ctx = document.getElementById('envChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: rawData.map(d => new Date(d.t).toLocaleTimeString()),
+                datasets: [
+                    {
+                        label: 'Temperature (C)',
+                        data: rawData.map(d => d.temp),
+                        borderColor: 'rgb(255, 99, 132)',
+                        tension: 0.1
+                    },
+                    {
+                        label: 'Humidity (%)',
+                        data: rawData.map(d => d.hum),
+                        borderColor: 'rgb(54, 162, 235)',
+                        tension: 0.1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { display: true, title: { display: true, text: 'Time' } },
+                    y: { display: true, title: { display: true, text: 'Value' } }
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}
