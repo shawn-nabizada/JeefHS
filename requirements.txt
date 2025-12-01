@@ -1,17 +1,7 @@
-# --- Core System ---
-python-dotenv
-
-# --- MQTT & Cloud ---
-paho-mqtt
-
-# --- Database ---
-# For connecting to Neon (Postgres)
+Flask
+gunicorn
 psycopg2-binary
-
-# --- Hardware (Raspberry Pi Only) ---
-# Only install these if running on the Pi. 
-# If testing on Mac/Windows, comment them out.
-adafruit-circuitpython-dht
-rpi.gpio
-picamera2
-opencv-python
+requests
+python-dotenv
+SQLAlchemy
+paho-mqtt
