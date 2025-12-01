@@ -137,33 +137,11 @@ def security_control():
 @app.route('/devices', methods=['GET', 'POST'])
 def devices():
     """Device Control Page: Toggle 3 devices."""
-    
-    # --- DEBUGGER: Fetch Valid Keys from Adafruit ---
-    valid_keys = "Unknown"
-    if ADAFRUIT_IO_USERNAME and ADAFRUIT_IO_KEY:
-        try:
-            url = f"https://io.adafruit.com/api/v2/{ADAFRUIT_IO_USERNAME}/feeds"
-            headers = {"X-AIO-Key": ADAFRUIT_IO_KEY}
-            r = requests.get(url, headers=headers, timeout=5)
-            if r.status_code == 200:
-                # Extract the 'key' from each feed
-                feeds = r.json()
-                keys = [f['key'] for f in feeds]
-                valid_keys = ", ".join(keys)
-            else:
-                valid_keys = f"Error fetching keys: {r.status_code}"
-        except Exception as e:
-            valid_keys = f"Connection Error: {e}"
-    
-    # Show the valid keys on the screen
-    flash(f"DEBUG - Valid Feed Keys found in your account: [{valid_keys}]", "info")
-    # ------------------------------------------------
-
     if request.method == 'POST':
         device = request.form.get("device")
         state = request.form.get("state")
         
-        # We will fix this map once we see the real keys!
+        # CORRECTED KEYS: Using dashes to match Adafruit IO
         feed_map = {
             "fan": "fan-control",
             "buzzer": "buzzer-control",
@@ -171,7 +149,7 @@ def devices():
         }
         
         if device in feed_map:
-            # Revert to clean sender (removing the debug URL return from previous step)
+            # aio_send returns True on success, False on failure
             if aio_send(feed_map[device], state):
                 flash(f"{device.title()} turned {state}", "success")
             else:
