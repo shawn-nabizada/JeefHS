@@ -1,39 +1,59 @@
-# Author 1: <Shawn Nabizada, 2333349>
-# Author 1: <Clayton Cheung, 2332707>
-
 import json
 import time
 import random
 import math
-from datetime import datetime, timedelta
-from pathlib import Path
+from datetime import datetime
 import logging
-import os
-
 import board
 
-# NOTE: moved DHT initialization into the class (no module-level GPIO setup)
-# import adafruit_dht  # imported lazily in __init__
-
-# Configure logging (unchanged)
+# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# --- Robust Pin Resolution ---
+try:
+    # Pi 5 / newer (BCM2712)
+    from adafruit_blinka.microcontroller.bcm2712 import pin as _pinmap
+except ImportError:
+    try:
+        # Pi 4 / older (BCM283x)
+        from adafruit_blinka.microcontroller.bcm283x import pin as _pinmap
+    except ImportError:
+        _pinmap = None
 
 def resolve_pin(pin_spec):
-    """Resolve a pin spec like 'D4' or 'BCM:17' into an object usable by Blinka/Adafruit libs."""
     if pin_spec is None:
         return None
+
+    def _gpio_obj_from_int(n: int):
+        if _pinmap:
+            attr = f"GPIO{n}"
+            if hasattr(_pinmap, attr):
+                return getattr(_pinmap, attr)
+        for cand in (f"D{n}", f"GP{n}", f"GPIO{n}"):
+            if hasattr(board, cand):
+                return getattr(board, cand)
+        raise RuntimeError(f"Could not resolve pin {n} on this device.")
+
     if isinstance(pin_spec, int):
-        return pin_spec
+        return _gpio_obj_from_int(pin_spec)
+
     if isinstance(pin_spec, str):
-        if pin_spec.upper().startswith("BCM:"):
-            return int(pin_spec.split(":", 1)[1])
-        try:
-            return getattr(board, pin_spec)
-        except AttributeError:
-            raise RuntimeError(f"Unknown board pin '{pin_spec}' (check config).")
-    raise TypeError(f"Unsupported pin spec type: {type(pin_spec)}")
+        spec = pin_spec.strip().upper()
+        if spec.startswith("BCM:"):
+            try:
+                bcm_pin = int(spec.split(":", 1)[1])
+                return _gpio_obj_from_int(bcm_pin)
+            except ValueError:
+                raise RuntimeError(f"Invalid BCM format: {pin_spec}")
+        if spec.startswith("D") and spec[1:].isdigit():
+            return _gpio_obj_from_int(int(spec[1:]))
+        if spec.startswith("GPIO") and spec[4:].isdigit():
+            return _gpio_obj_from_int(int(spec[4:]))
+        if hasattr(board, spec):
+            return getattr(board, spec)
+
+    raise ValueError(f"Unsupported pin specification: {pin_spec}")
 
 
 class environmental_module:
@@ -41,37 +61,37 @@ class environmental_module:
         self.config = self.load_config(config_file)
         self._dht = None
 
-        # Only touch GPIO if explicitly enabled
         if self.config.get("use_dht", False):
             try:
-                import adafruit_dht  # lazy import
+                import adafruit_dht
                 pins = self.config.get("PINS", {})
-                dht_pin = resolve_pin(pins.get("dht"))
-                if dht_pin is None:
-                    raise RuntimeError("PINS.dht missing in config.json")
+                
+                dht_pin_spec = pins.get("dht")
+                if not dht_pin_spec:
+                    raise ValueError("Key 'dht' is missing in config.json PINS")
+                
+                dht_pin = resolve_pin(dht_pin_spec)
+                logger.info(f"Initializing DHT11 on pin: {dht_pin}")
 
-                # Use DHT22 as requested
-                self._dht = adafruit_dht.DHT22(dht_pin, use_pulseio=False)
-                logger.info("DHT22 initialized")
-            except Exception as e:
-                logger.warning(f"DHT22 init failed, will simulate env readings: {e}")
+                # --- CHANGE IS HERE: DHT11 instead of DHT22 ---
+                self._dht = adafruit_dht.DHT11(dht_pin, use_pulseio=False)
+                logger.info("DHT11 Sensor successfully initialized.")
+
+            except ImportError:
+                logger.error("Failed to import 'adafruit_dht'. Is the library installed?")
                 self._dht = None
+            except Exception as e:
+                logger.warning(f"DHT11 init failed ({type(e).__name__}): {e}")
+                logger.warning("System will fall back to SIMULATED data.")
+                self._dht = None
+        else:
+            logger.info("DHT Sensor disabled in config. Using simulation.")
 
     def load_config(self, config_file):
-        """Load configuration from JSON file (kept as in original)."""
         default_config = {
-            "ADAFRUIT_IO_USERNAME": "username",
-            "ADAFRUIT_IO_KEY": "userkey",
-            "MQTT_BROKER": "io.adafruit.com",
-            "MQTT_PORT": 1883,
-            "MQTT_KEEPALIVE": 60,
-            "devices": ["living_room_light", "bedroom_fan", "front_door", "garage_door"],
-            "camera_enabled": True,
-            "capturing_interval": 900,
-            "flushing_interval": 10,
-            "sync_interval": 300
+            "dht_read_retries": 3,
+            "dht_retry_delay_s": 2.0
         }
-
         try:
             with open(config_file, 'r') as f:
                 config = json.load(f)
@@ -81,58 +101,49 @@ class environmental_module:
             return default_config
 
     def get_environmental_data(self):
-        # Minimal change: same structure; now only temperature & humidity (no pressure)
         temperature_c, humidity = 0, 0
+        source = 'simulated'
 
-        # Try real sensor first (if enabled/initialized)
-        if self._dht is not None:
-            # Make a few attempts to read the DHT sensor because DHT reads are flaky
+        if self._dht:
             retries = int(self.config.get('dht_read_retries', 3))
             delay = float(self.config.get('dht_retry_delay_s', 2.0))
-            last_exc = None
+            
             for attempt in range(1, retries + 1):
                 try:
                     t = self._dht.temperature
                     h = self._dht.humidity
-                    if t is None or h is None:
-                        raise ValueError("DHT22 returned None")
-                    temperature_c = round(float(t), 1)
-                    humidity = round(float(h), 1)
-                    logger.info(f"Environmental reading from sensor (attempt {attempt}): {temperature_c} C, {humidity}%")
-                    return {
-                        'timestamp': datetime.now().isoformat(),
-                        'temperature': temperature_c,
-                        'humidity': humidity,
-                        'source': 'sensor'
-                    }
+                    
+                    if t is not None and h is not None:
+                        temperature_c = round(float(t), 1)
+                        humidity = round(float(h), 1)
+                        source = 'sensor'
+                        return {
+                            'timestamp': datetime.now().isoformat(),
+                            'temperature': temperature_c,
+                            'humidity': humidity,
+                            'source': source
+                        }
+                except RuntimeError as e:
+                    logger.warning(f"DHT Read attempt {attempt} failed: {e}")
+                    time.sleep(delay)
                 except Exception as e:
-                    last_exc = e
-                    logger.debug(f"DHT read attempt {attempt} failed: {e}")
-                    if attempt < retries:
-                        time.sleep(delay)
-            # All attempts failed; fall back to simulation
-            logger.warning(f"DHT22 read failed after {retries} attempts, will simulate values: {last_exc}")
+                    logger.error(f"Unexpected DHT error: {e}")
+                    break
+            
+            logger.warning("All DHT read attempts failed. Returning simulated data.")
 
-        # Simulation path (original logic preserved, minus pressure)
+        # Fallback Simulation
         try:
-            # Simulate realistic temperature variations
-            base_temp = 22 + 5 * math.sin(time.time() / 3600)  # Daily cycle
+            base_temp = 22 + 5 * math.sin(time.time() / 3600)
             temperature_c = round(base_temp + random.uniform(-2, 2), 1)
-
-            # Humidity inversely related to temperature
             humidity = round(60 - (temperature_c - 20) * 2 + random.uniform(-5, 5), 1)
-            humidity = max(30, min(90, humidity))  # Clamp between 30-90%
+            humidity = max(30, min(90, humidity))
+        except Exception:
+            pass
 
-        except RuntimeError as error:
-            # Keep original error handling style
-            print(error.args[0])
-            time.sleep(2.0)
-
-        # Simulation path return value includes source info so callers and logs can distinguish
-        logger.info(f"Simulated environmental reading: {temperature_c} C, {humidity}%")
         return {
             'timestamp': datetime.now().isoformat(),
             'temperature': temperature_c,
             'humidity': humidity,
-            'source': 'simulated'
+            'source': source
         }

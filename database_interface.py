@@ -45,34 +45,16 @@ CREATE TABLE IF NOT EXISTS security_events (
 );
 """
 
-# --- Cloud (Neon) Schema (Reference) ---
-# Run these SQL commands in your Neon SQL Editor once to set up the cloud DB.
-"""
-CREATE TABLE IF NOT EXISTS measurements (
-    id SERIAL PRIMARY KEY,
-    timestamp TIMESTAMP,
-    temperature FLOAT,
-    humidity FLOAT,
-    device_id TEXT
-);
-
-CREATE TABLE IF NOT EXISTS security_events (
-    id SERIAL PRIMARY KEY,
-    timestamp TIMESTAMP,
-    event_type TEXT,
-    image_path TEXT,
-    mode TEXT,
-    device_id TEXT
-);
-"""
-
-
 class DatabaseInterface:
     def __init__(self, config: Dict):
         self.config = config
         self.local_db = "jeefhs_local.db"
-        # The DATABASE_URL comes from the .env file
+        
+        # --- FIX: Handle connection string format ---
         self.pg_conn_str = os.getenv("DATABASE_URL")
+        if self.pg_conn_str and self.pg_conn_str.startswith("postgres://"):
+            self.pg_conn_str = self.pg_conn_str.replace("postgres://", "postgresql://", 1)
+            
         self.device_id = "pi_01"  # Identifier for this device in the cloud
 
         self._init_local_db()

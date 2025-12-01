@@ -21,8 +21,10 @@
   "image_dir": "captured_images",
   "alert_cooldown_s": 300,
 
-  "env_sensor": "DHT22",
+  "env_sensor": "DHT11",
   "use_dht": true,
+  "dht_read_retries": 3,
+  "dht_retry_delay_s": 2.5,
 
   "devices": ["living_room_light", "bedroom_fan", "front_door", "garage_door"],
 
