@@ -50,7 +50,7 @@ def aio_send(feed_key, value):
         return "Missing Credentials"
 
     # --- DEBUGGING: SHOW URL ON SCREEN ---
-    url = f"https://io.adafruit.com/api/v2/{ADAFRUIT_IO_USERNAME}/feeds/{feed_key}/data"
+    url = f"https://io.adafruit.com/{ADAFRUIT_IO_USERNAME}/feeds/{feed_key}/data"
     
     # We will temporarily return the URL itself if the request fails
     # so you can read it on the webpage!
