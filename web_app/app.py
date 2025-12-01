@@ -47,25 +47,17 @@ def aio_get(feed_key):
 def aio_send(feed_key, value):
     """Publish a value to an Adafruit IO feed."""
     if not ADAFRUIT_IO_USERNAME or not ADAFRUIT_IO_KEY:
-        return "Missing Credentials"
+        return False
 
-    # --- DEBUGGING: SHOW URL ON SCREEN ---
-    url = f"https://io.adafruit.com/{ADAFRUIT_IO_USERNAME}/feeds/{feed_key}/data"
-    
-    # We will temporarily return the URL itself if the request fails
-    # so you can read it on the webpage!
-    # -------------------------------------
-
+    url = f"https://io.adafruit.com/api/v2/{ADAFRUIT_IO_USERNAME}/feeds/{feed_key}/data"
     headers = {"X-AIO-Key": ADAFRUIT_IO_KEY, "Content-Type": "application/json"}
     payload = {"value": value}
     try:
         r = requests.post(url, headers=headers, json=payload, timeout=5)
-        if r.status_code not in [200, 201]:
-            # RETURN THE URL + THE ERROR CODE
-            return f"Error {r.status_code} at URL: [{url}]"
-        return True
+        return r.status_code in [200, 201]
     except Exception as e:
-        return f"Connection Error: {str(e)}"
+        print(f"AIO Send Error ({feed_key}): {e}")
+        return False
 
 # --- Routes ---
 
@@ -145,23 +137,45 @@ def security_control():
 @app.route('/devices', methods=['GET', 'POST'])
 def devices():
     """Device Control Page: Toggle 3 devices."""
+    
+    # --- DEBUGGER: Fetch Valid Keys from Adafruit ---
+    valid_keys = "Unknown"
+    if ADAFRUIT_IO_USERNAME and ADAFRUIT_IO_KEY:
+        try:
+            url = f"https://io.adafruit.com/api/v2/{ADAFRUIT_IO_USERNAME}/feeds"
+            headers = {"X-AIO-Key": ADAFRUIT_IO_KEY}
+            r = requests.get(url, headers=headers, timeout=5)
+            if r.status_code == 200:
+                # Extract the 'key' from each feed
+                feeds = r.json()
+                keys = [f['key'] for f in feeds]
+                valid_keys = ", ".join(keys)
+            else:
+                valid_keys = f"Error fetching keys: {r.status_code}"
+        except Exception as e:
+            valid_keys = f"Connection Error: {e}"
+    
+    # Show the valid keys on the screen
+    flash(f"DEBUG - Valid Feed Keys found in your account: [{valid_keys}]", "info")
+    # ------------------------------------------------
+
     if request.method == 'POST':
         device = request.form.get("device")
         state = request.form.get("state")
         
+        # We will fix this map once we see the real keys!
         feed_map = {
-            "fan": "fan_control",
-            "buzzer": "buzzer_control",
-            "party": "party_mode_control"
+            "fan": "fan-control",
+            "buzzer": "buzzer-control",
+            "party": "party-mode-control"
         }
         
         if device in feed_map:
-            result = aio_send(feed_map[device], state)
-            if result is True:
+            # Revert to clean sender (removing the debug URL return from previous step)
+            if aio_send(feed_map[device], state):
                 flash(f"{device.title()} turned {state}", "success")
             else:
-                # Show the specific error message on the webpage
-                flash(f"Failed: {result}", "danger")
+                flash("Failed to communicate with device", "danger")
     
     return render_template("devices.html")
 
