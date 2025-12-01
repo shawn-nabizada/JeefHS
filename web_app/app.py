@@ -46,12 +46,16 @@ def aio_get(feed_key):
 
 def aio_send(feed_key, value):
     """Publish a value to an Adafruit IO feed."""
-    # DEBUG: Check if credentials exist
     if not ADAFRUIT_IO_USERNAME or not ADAFRUIT_IO_KEY:
-        print(f"AIO Send Failed: Missing Credentials for {feed_key}")
-        return "Missing Adafruit IO Credentials"
+        print("AIO Send Failed: Missing Credentials")
+        return "Missing Credentials"
 
+    # --- DEBUGGING PRINT ---
+    # This will show up in your Render Logs!
     url = f"https://io.adafruit.com/api/v2/{ADAFRUIT_IO_USERNAME}/feeds/{feed_key}/data"
+    print(f"DEBUG: Trying to POST to: [{url}]") 
+    # -----------------------
+
     headers = {"X-AIO-Key": ADAFRUIT_IO_KEY, "Content-Type": "application/json"}
     payload = {"value": value}
     try:
