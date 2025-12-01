@@ -46,18 +46,23 @@ def aio_get(feed_key):
 
 def aio_send(feed_key, value):
     """Publish a value to an Adafruit IO feed."""
+    # DEBUG: Check if credentials exist
     if not ADAFRUIT_IO_USERNAME or not ADAFRUIT_IO_KEY:
-        return False
+        print(f"AIO Send Failed: Missing Credentials for {feed_key}")
+        return "Missing Adafruit IO Credentials"
 
     url = f"https://io.adafruit.com/api/v2/{ADAFRUIT_IO_USERNAME}/feeds/{feed_key}/data"
     headers = {"X-AIO-Key": ADAFRUIT_IO_KEY, "Content-Type": "application/json"}
     payload = {"value": value}
     try:
         r = requests.post(url, headers=headers, json=payload, timeout=5)
-        return r.status_code in [200, 201]
+        if r.status_code not in [200, 201]:
+            print(f"AIO Response Error: {r.status_code} - {r.text}")
+            return f"API Error: {r.status_code}"
+        return True
     except Exception as e:
         print(f"AIO Send Error ({feed_key}): {e}")
-        return False
+        return f"Connection Error: {str(e)}"
 
 # --- Routes ---
 
@@ -141,8 +146,6 @@ def devices():
         device = request.form.get("device")
         state = request.form.get("state")
         
-        # Mapping form names to Adafruit IO Feed Keys
-        # Ensure these match config.json "CONTROL_FEEDS"
         feed_map = {
             "fan": "fan_control",
             "buzzer": "buzzer_control",
@@ -150,10 +153,12 @@ def devices():
         }
         
         if device in feed_map:
-            if aio_send(feed_map[device], state):
+            result = aio_send(feed_map[device], state)
+            if result is True:
                 flash(f"{device.title()} turned {state}", "success")
             else:
-                flash("Failed to communicate with device", "danger")
+                # Show the specific error message on the webpage
+                flash(f"Failed: {result}", "danger")
     
     return render_template("devices.html")
 
