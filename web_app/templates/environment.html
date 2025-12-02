@@ -1,58 +1,103 @@
 {% extends "layout.html" %}
 {% block content %}
-<h2>Environmental Data</h2>
-<div class="card mb-4">
-    <div class="card-body">
-        <form method="POST" class="row g-3 align-items-center">
-            <div class="col-auto">
-                <label for="date" class="col-form-label">Select Date:</label>
-            </div>
-            <div class="col-auto">
-                <input type="date" id="date" name="date" class="form-control" value="{{ selected_date }}" required>
-            </div>
-            <div class="col-auto">
-                <button type="submit" class="btn btn-primary">Load Data</button>
-            </div>
-        </form>
+<div class="row mb-4">
+    <div class="col-12 text-center">
+        <h1 class="display-5 fw-bold">Environmental History</h1>
+        <p class="text-muted">Analyze temperature and humidity trends over time.</p>
     </div>
 </div>
 
-<div class="card">
-    <div class="card-body">
-        <canvas id="envChart"></canvas>
+<div class="row justify-content-center mb-5">
+    <div class="col-md-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <form method="POST" class="row g-3 align-items-center justify-content-center">
+                    <div class="col-auto">
+                        <label for="date" class="col-form-label fw-bold">📅 Select Date:</label>
+                    </div>
+                    <div class="col-auto">
+                        <input type="date" id="date" name="date" class="form-control" value="{{ selected_date }}" required>
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary px-4 rounded-pill">Load Data</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-12">
+        <div class="card shadow-lg border-0 rounded-3 p-3">
+            <div class="card-body">
+                <canvas id="envChart" style="max-height: 500px;"></canvas>
+            </div>
+        </div>
     </div>
 </div>
 
 <script>
     const rawData = {{ data | tojson }};
+    const ctx = document.getElementById('envChart').getContext('2d');
+
     if (rawData.length === 0) {
-        document.getElementById('envChart').insertAdjacentHTML('beforebegin', '<div class="alert alert-warning">No data found for this date.</div>');
+        // Replace canvas with a nice alert if no data
+        document.getElementById('envChart').style.display = 'none';
+        document.querySelector('.card-body').insertAdjacentHTML('beforeend', 
+            '<div class="alert alert-warning text-center m-0">🚫 No data found for this date. Try selecting another day.</div>'
+        );
     } else {
-        const ctx = document.getElementById('envChart').getContext('2d');
+        // Render Chart
         new Chart(ctx, {
             type: 'line',
             data: {
-                labels: rawData.map(d => new Date(d.t).toLocaleTimeString()),
+                labels: rawData.map(d => new Date(d.t).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})),
                 datasets: [
                     {
-                        label: 'Temperature (C)',
+                        label: 'Temperature (°C)',
                         data: rawData.map(d => d.temp),
-                        borderColor: 'rgb(255, 99, 132)',
-                        tension: 0.1
+                        borderColor: '#dc3545', // Danger Red
+                        backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 0,
+                        pointHoverRadius: 6
                     },
                     {
                         label: 'Humidity (%)',
                         data: rawData.map(d => d.hum),
-                        borderColor: 'rgb(54, 162, 235)',
-                        tension: 0.1
+                        borderColor: '#0d6efd', // Primary Blue
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 0,
+                        pointHoverRadius: 6
                     }
                 ]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        titleColor: '#000',
+                        bodyColor: '#000',
+                        borderColor: '#ddd',
+                        borderWidth: 1
+                    }
+                },
                 scales: {
-                    x: { display: true, title: { display: true, text: 'Time' } },
-                    y: { display: true, title: { display: true, text: 'Value' } }
+                    x: { grid: { display: false } },
+                    y: { border: { dash: [4, 4] }, grid: { color: '#f0f0f0' } }
                 }
             }
         });

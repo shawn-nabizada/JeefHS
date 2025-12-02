@@ -1,46 +1,60 @@
 {% extends "layout.html" %}
 {% block content %}
-<h2>Device Control</h2>
-<div class="row">
-    <!-- Fan Control -->
-    <div class="col-md-4">
-        <div class="card text-center mb-3">
-            <div class="card-header">Bedroom Fan</div>
-            <div class="card-body">
-                <form method="POST">
-                    <input type="hidden" name="device" value="fan">
-                    <button name="state" value="ON" class="btn btn-success w-40">ON</button>
-                    <button name="state" value="OFF" class="btn btn-danger w-40">OFF</button>
-                </form>
-            </div>
-        </div>
+<div class="row mb-4">
+    <div class="col-12 text-center">
+        <h1 class="display-5 fw-bold">Device Control Hub</h1>
+        <p class="text-muted">Remote actuation and state management.</p>
     </div>
+</div>
+
+<div class="row g-4 justify-content-center">
     
-    <!-- Buzzer Control -->
     <div class="col-md-4">
-        <div class="card text-center mb-3">
-            <div class="card-header">Buzzer (Alert)</div>
-            <div class="card-body">
-                <form method="POST">
-                    <input type="hidden" name="device" value="buzzer">
-                    <button name="state" value="ON" class="btn btn-warning w-100">TRIGGER PULSE</button>
-                </form>
-            </div>
+        <div class="feature-card p-4 h-100 rounded bg-white border text-center">
+            <div class="card-icon text-primary mb-3">💨</div>
+            <h3 class="fw-bold">Bedroom Fan</h3>
+            <p class="text-muted small mb-4">Active cooling system</p>
+            
+            <form method="POST" class="d-grid gap-2">
+                <input type="hidden" name="device" value="fan">
+                <div class="btn-group" role="group" aria-label="Fan Control">
+                    <button type="submit" name="state" value="ON" class="btn btn-outline-success btn-lg">ON</button>
+                    <button type="submit" name="state" value="OFF" class="btn btn-outline-danger btn-lg">OFF</button>
+                </div>
+            </form>
         </div>
     </div>
 
-    <!-- Party Mode Control -->
     <div class="col-md-4">
-        <div class="card text-center mb-3">
-            <div class="card-header">Party Mode (LEDs)</div>
-            <div class="card-body">
-                <form method="POST">
-                    <input type="hidden" name="device" value="party">
-                    <button name="state" value="ON" class="btn btn-primary w-40">START</button>
-                    <button name="state" value="OFF" class="btn btn-dark w-40">STOP</button>
-                </form>
-            </div>
+        <div class="feature-card p-4 h-100 rounded bg-white border text-center">
+            <div class="card-icon text-warning mb-3">🎉</div>
+            <h3 class="fw-bold">Party Mode</h3>
+            <p class="text-muted small mb-4">LED Light Show</p>
+            
+            <form method="POST" class="d-grid gap-2">
+                <input type="hidden" name="device" value="party">
+                <div class="btn-group" role="group" aria-label="Party Mode Control">
+                    <button type="submit" name="state" value="ON" class="btn btn-outline-primary btn-lg">START</button>
+                    <button type="submit" name="state" value="OFF" class="btn btn-outline-dark btn-lg">STOP</button>
+                </div>
+            </form>
         </div>
     </div>
+
+    <div class="col-md-4">
+        <div class="feature-card p-4 h-100 rounded bg-white border text-center">
+            <div class="card-icon text-danger mb-3">🔔</div>
+            <h3 class="fw-bold">Alarm Buzzer</h3>
+            <p class="text-muted small mb-4">Emergency audio signal</p>
+            
+            <form method="POST" class="d-grid">
+                <input type="hidden" name="device" value="buzzer">
+                <button type="submit" name="state" value="ON" class="btn btn-danger btn-lg rounded-pill">
+                    ⚠️ TRIGGER PULSE
+                </button>
+            </form>
+        </div>
+    </div>
+
 </div>
 {% endblock %}
