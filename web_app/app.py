@@ -62,8 +62,13 @@ def aio_send(feed_key, value):
 # --- Routes ---
 
 @app.route('/')
+def home():
+    """New Home/About Page."""
+    return render_template("home.html")
+
+@app.route('/dashboard')
 def dashboard():
-    """Home Page: Live status of 3 sensors."""
+    """Dashboard Page: Live status of 3 sensors."""
     # Feeds: temperature, humidity, mode_status
     temp_data = aio_get("temperature")
     hum_data = aio_get("humidity")
@@ -159,6 +164,7 @@ def devices():
 
 @app.route('/about')
 def about():
+    """Team Page."""
     return render_template("about.html")
 
 if __name__ == '__main__':

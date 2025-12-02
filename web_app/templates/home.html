@@ -1,0 +1,61 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="p-5 mb-4 bg-light rounded-3 shadow-sm hero-section text-center">
+    <div class="container-fluid py-5">
+        <h1 class="display-3 fw-bold">Jeef Home Security</h1>
+        <p class="col-md-8 fs-4 mx-auto">Smart. Secure. Resilient.</p>
+        <p class="text-muted mb-4">Bridging Edge Computing with Cloud Intelligence.</p>
+        <a class="btn btn-primary btn-lg px-4 gap-3" href="{{ url_for('dashboard') }}" role="button">Open Dashboard</a>
+    </div>
+</div>
+
+<div class="row align-items-center mb-5">
+    <div class="col-md-6">
+        <h2 class="fw-bold mb-3">Hybrid Edge/Cloud Architecture</h2>
+        <p class="lead">JeefHS isn't just a tracker; it's a distributed system designed for reliability.</p>
+        <p>The system operates on a <strong>Local-First</strong> principle. The Raspberry Pi (Edge) manages immediate security threats and device control locally to ensure zero latency. Data is synchronized with the Cloud (Neon Postgres) only when connectivity allows, ensuring no data loss during internet outages.</p>
+    </div>
+    <div class="col-md-6">
+        <div class="p-4 border rounded bg-white shadow-sm">
+            <h5 class="border-bottom pb-2">System Flow</h5>
+            <ul class="list-unstyled">
+                <li class="mb-2">📡 <strong>Sensors (DHT22, PIR)</strong> &rarr; Raspberry Pi</li>
+                <li class="mb-2">⚡ <strong>Actuators (Fan, LED)</strong> &larr; GPIO Control</li>
+                <li class="mb-2">💾 <strong>Offline Cache</strong> &rarr; Local SQLite</li>
+                <li class="mb-0">☁️ <strong>Cloud Sync</strong> &harr; Adafruit IO & Postgres</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-5">
+    <div class="col-12 text-center mb-2">
+        <h2 class="fw-bold">Key Capabilities</h2>
+    </div>
+
+    <div class="col-md-4">
+        <div class="feature-card p-4 h-100 rounded bg-white border">
+            <div class="card-icon mb-3">🔄</div>
+            <h3>Offline Sync</h3>
+            <p>Internet down? No problem. Events are logged to a local SQLite database and automatically batch-uploaded to the cloud when connectivity returns.</p>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="feature-card p-4 h-100 rounded bg-white border">
+            <div class="card-icon mb-3">🚀</div>
+            <h3>Real-Time MQTT</h3>
+            <p>Instant communication between the web dashboard and hardware actuators using the lightweight MQTT protocol via Adafruit IO.</p>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="feature-card p-4 h-100 rounded bg-white border">
+            <div class="card-icon mb-3">🛡️</div>
+            <h3>Security Logs</h3>
+            <p>Intrusion events are captured with timestamps and images, securely stored in a Neon Postgres database for historical auditing.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

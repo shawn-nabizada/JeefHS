@@ -1,3 +1,70 @@
-body { background-color: #f8f9fa; }
-.card { box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-.navbar-brand { font-weight: bold; }
+:root {
+    --primary-color: #0d6efd;
+    --secondary-color: #6c757d;
+    --bg-light: #f8f9fa;
+    --text-dark: #212529;
+    --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --hover-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+}
+
+body {
+    background-color: var(--bg-light);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: var(--text-dark);
+}
+
+/* Navbar Tweaks */
+.navbar-brand {
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+/* Hero Section */
+.hero-section {
+    background: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
+    border: none;
+}
+
+/* 3D Feature Cards */
+.feature-card {
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Bouncy transition */
+    transform-style: preserve-3d;
+    perspective: 1000px;
+    cursor: default;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+.feature-card:hover {
+    transform: translateY(-10px) rotateX(5deg);
+    box-shadow: var(--hover-shadow);
+    border-color: var(--primary-color);
+}
+
+.card-icon {
+    font-size: 3rem;
+    display: block;
+    transition: transform 0.4s ease;
+}
+
+.feature-card:hover .card-icon {
+    transform: scale(1.2) translateZ(20px); /* Icon pops out further */
+}
+
+/* General UI Polish */
+.card {
+    border: none;
+    box-shadow: var(--card-shadow);
+    border-radius: 12px;
+}
+
+h1, h2, h3 {
+    font-weight: 600;
+}
+
+.btn-primary {
+    border-radius: 50px;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    font-weight: 600;
+}

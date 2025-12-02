@@ -1,18 +1,48 @@
 {% extends "layout.html" %}
+
 {% block content %}
-<div class="jumbotron">
-    <h1 class="display-4">JeefHS IoT Project</h1>
-    <p class="lead">IoT Home Automation and Security System.</p>
-    <hr class="my-4">
-    <p><strong>Developed by:</strong> Shawn Nabizada & Clayton Cheung</p>
-    <p><strong>Course:</strong> 420-N55 IoT: Design and Prototyping</p>
-    <p><strong>Features:</strong></p>
-    <ul>
-        <li>Real-time Environmental Monitoring (DHT22)</li>
-        <li>Security System with Camera Capture (PiCamera2)</li>
-        <li>Remote Device Control via MQTT (Adafruit IO)</li>
-        <li>Cloud Data Persistence (Neon Postgres)</li>
-        <li>Historical Data Visualization (Chart.js)</li>
-    </ul>
+<div class="text-center mb-5">
+    <h1 class="display-4 fw-bold">Meet the Developers</h1>
+    <p class="lead text-muted">The team behind JeefHS.</p>
+</div>
+
+<div class="row justify-content-center g-4">
+    
+    <div class="col-md-5">
+        <div class="feature-card p-5 h-100 rounded bg-white border text-center">
+            <div class="card-icon mb-3">⚙️</div>
+            <h2 class="fw-bold">Clayton Cheung</h2>
+            <hr class="my-4 mx-auto" style="width: 50px; border-top: 3px solid var(--primary-color); opacity: 1;">
+            <div class="text-start">
+                <h5 class="text-muted mb-3">Core Responsibilities</h5>
+                <ul class="list-unstyled">
+                    <li class="mb-2">🗄️ <strong>Database Architecture</strong><br><small class="text-muted">Designed SQL schema & managed migrations.</small></li>
+                    <li class="mb-2">🔌 <strong>Hardware Configuration</strong><br><small class="text-muted">Physical wiring, sensor integration & Pi setup.</small></li>
+                    <li class="mb-2">📊 <strong>Data Systems</strong><br><small class="text-muted">Backend logic for reliable data logging.</small></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-5">
+        <div class="feature-card p-5 h-100 rounded bg-white border text-center">
+            <div class="card-icon mb-3">💻</div>
+            <h2 class="fw-bold">Shawn Nabizada</h2>
+            <hr class="my-4 mx-auto" style="width: 50px; border-top: 3px solid var(--primary-color); opacity: 1;">
+            <div class="text-start">
+                <h5 class="text-muted mb-3">Core Responsibilities</h5>
+                <ul class="list-unstyled">
+                    <li class="mb-2">🌐 <strong>Web Application</strong><br><small class="text-muted">Full-stack Flask development & UI/UX design.</small></li>
+                    <li class="mb-2">🐍 <strong>System Logic</strong><br><small class="text-muted">General Python coding & application orchestration.</small></li>
+                    <li class="mb-2">📡 <strong>Cloud Integration</strong><br><small class="text-muted">MQTT communication & API handling.</small></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="text-center mt-5 pt-4">
+    <p class="text-muted">Course: 420-N55 IoT: Design and Prototyping</p>
 </div>
 {% endblock %}
