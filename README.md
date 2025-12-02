@@ -1,161 +1,161 @@
 # Jeef Home Security (JeefHS)
 
-[Demo video (YouTube)](https://youtu.be/M_X60AuhMnQ?si=Q_FRKQtvKjA0x56r)
+[Demo video (YouTube)](https://youtu.be/M_X60AuhMnQ?si=Q_FRKQtvKjA0x56r) \|
+[Flask Dashboard](https://jeefhomesecurity.onrender.com/devices) \|
+[Adafruit IO Dashboard](https://io.adafruit.com/Snab/dashboards/jeefhs)
 
-## Table of contents
+## Table of Contents
 - [Overview](#overview)
-- [Quick start](#quick-start)
-- [Configuration](#configuration)
-- [Project structure (files & purpose)](#project-structure-files--purpose)
-- [How it works (module responsibilities)](#how-it-works-module-responsibilities)
-- [Contract (inputs/outputs)](#contract-inputsoutputs)
-- [What we learned](#what-we-learned)
+- [System Architecture](#system-architecture)
+- [Quick Start](#quick-start)
+- [Configuration (.env & config.json)](#configuration-env--configjson)
+- [Project Structure](#project-structure)
+- [Web Application](#web-application)
+- [How It Works (Offline Sync)](#how-it-works-offline-sync)
+- [What We Learned](#what-we-learned)
+
 
 ## Overview
 
-Created by Shawn Nabizada and Clayton Cheung, JeefHS is a lightweight, modular Python home system that coordinates environmental sensing, device control (LEDs, fan, buzzer), security monitoring (PIR + camera), and cloud communication via MQTT (Adafruit IO compatible). The entry point is `jeefHS.py`, which reads a JSON configuration, wires together the modules, then runs a continuous data-collection loop that logs events, publishes telemetry, and responds to remote control messages.
+Created by Shawn Nabizada and Clayton Cheung, **JeefHS** is a
+comprehensive IoT home security system that bridges edge computing
+(Raspberry Pi) with cloud services (Adafruit IO & Neon Postgres).
 
-This README documents how to set up and run the project, the configuration options it expects, the roles of the main modules, and the system I/O contract.
+The system coordinates environmental sensing, device actuators (LEDs,
+fan, buzzer), and security monitoring (PIR + Camera). Unlike simple
+trackers, JeefHS features a **robust offline-first architecture**: it
+logs data locally to SQLite when the internet is down and synchronizes
+with a cloud Postgres database when connectivity returns. A custom
+**Flask Web Application** provides a user interface to view historical
+data, check intrusion logs, and control devices remotely.
 
-## Quick start
+## System Architecture
 
-1. Create and activate a virtual environment:
+JeefHS follows a hybrid Edge/Cloud architecture:
 
-```bash
+### Edge (Raspberry Pi)
+
+-   Runs the main event loop (`jeefHS.py`)
+-   Collects sensor data (DHT22, PIR)
+-   Controls actuators (LEDs, Fan, Buzzer) via GPIO
+-   Publishes live telemetry to **Adafruit IO** via MQTT
+-   Logs events immediately to a local **SQLite** database (offline
+    cache)
+-   Background sync thread uploads unsynced data to **Neon Postgres**
+    when internet connectivity is restored
+
+### Cloud
+
+-   **Adafruit IO**: MQTT broker for real-time control and dashboards
+-   **Neon Postgres**: Persistent storage for historical data and
+    security logs
+
+### User Interface (Flask)
+
+-   Hosted locally or on a cloud platform (e.g., Render)
+-   Live data fetched from Adafruit IO APIs
+-   Historical data queried from Postgres using SQL
+
+## Quick Start
+
+### 1. Create and activate a virtual environment
+
+``` bash
 python3 -m venv venv
 source venv/bin/activate
 ```
 
-2. Install runtime dependencies. The code uses `paho-mqtt` (MQTT client) and hardware-specific libraries when running on a Raspberry Pi. Install the minimum set below and add more as needed for your hardware (e.g., `adafruit-circuitpython-dht`, `picamera2`, `opencv-python`):
+### 2. Install dependencies
 
-```bash
-pip install paho-mqtt
-# optional (hardware and camera):
-# pip install adafruit-circuitpython-dht picamera2 opencv-python
+``` bash
+pip install -r requirements.txt
+# or manually:
+# pip install paho-mqtt flask sqlalchemy psycopg2-binary python-dotenv adafruit-circuitpython-dht picamera2
 ```
 
-3. Copy the example configuration and edit values for your environment:
+### 3. Set up secrets (.env)
 
-```bash
-cp sampleConfig.json config.json
-# then edit config.json and set ADafRUIT/MQTT/SMTP credentials and pins
+Create a `.env` file in the project root (do not commit this file):
+
+``` bash
+ADAFRUIT_IO_USERNAME=your_username
+ADAFRUIT_IO_KEY=your_aio_key
+DATABASE_URL=postgresql://user:pass@ep-xyz.aws.neon.tech/neondb
 ```
 
-4. Run the app:
+### 4. Configure hardware (config.json)
 
-```bash
+In `config.json`, update GPIO pins, feed
+names, and intervals as needed.
+
+### 5. Run the system
+
+**Start the IoT system (Raspberry Pi):**
+
+``` bash
 python3 jeefHS.py
 ```
 
-Notes:
-- `jeefHS.py` expects `config.json` by default. You can supply another file by editing the script's call in `if __name__ == '__main__'` or modify instantiation.
-- If you run off a Raspberry Pi, install the hardware-related packages above. The code falls back to simulated environmental readings and software stubs for GPIO if hardware libraries are not present.
+**Start the web interface:**
 
-## Configuration
+``` bash
+python3 web_app/app.py
+```
 
-Configuration is read from `config.json` (use `sampleConfig.json` as a template). Key configuration values used by the code are:
+## Configuration (.env & config.json)
 
-- MQTT / Adafruit IO
-	- `ADAFRUIT_IO_USERNAME` (string) — Adafruit IO username used to build publish/subscribe topics
-	- `ADAFRUIT_IO_KEY` (string) — Adafruit IO key / password
-	- `MQTT_BROKER` (string) — MQTT broker host (default `io.adafruit.com` in samples)
-	- `MQTT_PORT` (int) — MQTT port (default 1883; TLS may use 8883)
-	- `MQTT_KEEPALIVE` (int) — MQTT keepalive seconds
-	- `use_tls` (bool) — enable TLS for MQTT connections
+### Secrets (.env)
 
-- Feeds and topics
-	- `CONTROL_FEEDS` (object) — map of logical device names to feed keys (e.g. `"party_mode": "party_mode_control"`). These feed keys are subscribed by `MQTT_communicator` and mapped back to device names.
-	- `ENV_FEEDS` (object) — mapping of environmental keys to feed names (e.g. `"temperature": "temperature"`). Used when publishing sensor telemetry.
-	- `SECURITY_FEEDS` (object) — mapping used for publishing security summaries (e.g. motion counts).
-	- `STATUS_FEEDS` (object) — e.g. `mode` status feed name
-	- `HEARTBEAT_FEED` (string) — topic/feed name used to publish periodic heartbeats
-	- `heartbeat_interval` (int) — seconds between heartbeats
+-   `ADAFRUIT_IO_USERNAME`, `ADAFRUIT_IO_KEY`: MQTT and API access
+-   `DATABASE_URL`: Cloud Postgres (Neon) connection string
 
-- Timing / intervals
-	- `security_check_interval` (int) — how often (s) to read security sensors
-	- `security_send_interval` (int) — how often (s) to publish security summaries
-	- `env_interval` (int) — how often (s) to publish environmental readings
-	- `flushing_interval` (int) — how frequently (s) the local log buffer is flushed to disk
+### Application Settings (config.json)
 
-- Devices and pins
-	- `devices` (array) — logical device list (legacy usage)
-	- `PINS` (object) — mapping of required pin names to pin specifiers. Required PINS in the code: `pir`, `dht`, `red_led`, `green_led`, `blue_led`, `fan`, `buzzer`. Pin specifiers may be strings like `"D13"`, `"BCM:17"` or integers depending on the module.
-	- `use_dht` (bool) — whether to initialize a DHT22 sensor; otherwise environmental readings are simulated
+-   **Feeds**: Mapping of logical names to Adafruit IO feeds
+-   **Pins**: GPIO pin assignments
+-   **Timers**:
+    -   `security_check_interval`
+    -   `env_interval`
+    -   `heartbeat_interval`
 
-- Security / camera / alerts
-	- `camera_enabled` (bool) — enable image capture on motion
-	- `image_dir` (string) — directory to write captured images
-	- `alert_cooldown_s` (int) — minimum seconds between repeated email alerts of the same type
-	- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `ALERT_FROM`, `ALERT_TO` — SMTP configuration used by `security_module` to send alerts via Brevo (or another SMTP relay)
+## Project Structure
 
-Tip: Keep secrets (MQTT keys, SMTP password) out of source control. Consider using environment-variable injection or a separate excluded config for credentials.
+-   `jeefHS.py` --- Main application loop and orchestration
+-   `database_interface.py` --- Local SQLite storage and cloud sync engine
+-   `MQTT_communicator.py` --- MQTT publisher/subscriber handler
+-   `security_module.py` --- PIR motion detection and camera capture
+-   `environmental_module.py` --- Temperature and humidity sensing
+-   `device_control_module.py` --- GPIO abstraction for actuators
+-   `web_app/`
+    -   `app.py` --- Flask application
+    -   `templates/` --- HTML views (Dashboard, Environment, Security,
+        Devices)
 
-## Project structure (files & purpose)
+## Web Application
 
-- `jeefHS.py` — Main application: loads configuration, composes modules, runs the data collection loop, handles logging and high-level orchestration (including party-mode behavior).
-- `MQTT_communicator.py` — MQTT client wrapper using `paho-mqtt`. Subscribes to control feeds (`CONTROL_FEEDS`), decodes messages, and forwards device or mode commands to registered callbacks. Also provides `send_to_adafruit_io` for publishing telemetry.
-- `device_control_module.py` — Abstraction over GPIO outputs (LEDs, fan, buzzer). Resolves pin specs, initialises outputs (or uses software fallbacks when run off-Pi), tracks states, and offers `set_device_state`, `pulse_buzzer`, and status reporting.
-- `environmental_module.py` — Reads a DHT22 sensor when configured (with retries) and otherwise simulates temperature and humidity values. Exposes `get_environmental_data()` which returns a dict with `timestamp`, `temperature`, `humidity`, and `source`.
-- `mode_manager.py` — Small thread-safe manager for global modes: `HOME`, `AWAY`, `NIGHT`. Allows registering callbacks to react to mode changes.
-- `security_module.py` — Monitors a PIR input, captures images with Picamera2 on motion, sends email alerts via SMTP with cooldown handling, and returns structured security event data.
-- `sampleConfig.json` — Example configuration to copy into `config.json` and edit.
-- `config.json` — Runtime configuration (not committed by convention; present here if you configured it locally).
+The Flask dashboard provides:
 
-## How it works (module responsibilities)
+-   **Dashboard**: Live temperature, humidity, and system mode
+-   **Environment History**: Date-based temperature and humidity charts
+-   **Security Logs**: Motion detection history with timestamps and images
+-   **Device Control**: Remote control of Fan, Buzzer, and Party Mode
 
-- jeefHS.py (JeefHSApp)
-	- Reads `config.json` and composes the system: `ModeManager`, `device_control_module`, `environmental_module`, `security_module`, and `MQTT_communicator`.
-	- Registers callbacks: mode changes are published; MQTT device commands are handled and routed.
-	- Runs `data_collection_loop()` which periodically collects environmental and security data, writes JSONL log lines to daily files, publishes to cloud feeds, and optionally sends heartbeat messages.
-	- Implements a `party_mode` feature that animates the three LEDs in a background thread when triggered via the `party_mode` control feed.
+## How It Works (Offline Sync)
 
-- MQTT_communicator
-	- Loads `CONTROL_FEEDS` and subscribes to the corresponding Adafruit IO topics. When a message arrives it maps the feed key back to a logical device or to `mode`, and calls the registered callbacks:
-		- For device feeds: calls `on_set_device_state(device_name, bool)`
-		- For mode feed: calls `on_set_mode(mode_string)`
-	- Provides `send_to_adafruit_io(feed_name, value)` to publish telemetry and status updates.
+1.  Sensor data and events are always written to local SQLite with `synced = 0`
+2.  A background sync thread runs every 10 seconds
+3.  Unsynced rows are batch-inserted into the Postgres database
+4.  On success, local rows are marked as `synced = 1`
+5.  Failures are retried automatically
 
-- device_control_module
-	- Resolves configured pins and creates output objects. If Blinka/digitalio is unavailable the module uses in-memory fallbacks so the code can run on non-Pi environments for testing.
-	- Exposes `set_device_state(device_name, on)` to toggle devices and `pulse_buzzer()` for momentary buzzer activation.
+This guarantees no data loss during internet outages.
 
-- environmental_module
-	- If `use_dht` is true and the DHT library is present, attempts a robust read with retries.
-	- Otherwise returns a simulated but realistic temperature/humidity reading.
+## What We Learned
 
-- mode_manager
-	- Maintains a canonical uppercase mode value in `{'HOME','AWAY','NIGHT'}` and notifies registered callbacks on changes.
-
-- security_module
-	- Reads PIR input and, on motion, optionally captures a photo with Picamera2 and saves to `image_dir`.
-	- Sends email alerts using SMTP (Brevo by default in samples) with cooldowns to avoid alert storms. Also reports whether the buzzer was triggered.
-
-## Contract (inputs/outputs)
-
-- Inputs:
-	- `config.json` — JSON configuration file read at startup (contains credentials, pins, feed mappings, and intervals).
-	- MQTT control messages on feeds mapped by `CONTROL_FEEDS`. Payloads like `ON`, `OFF`, `1`, `0` are interpreted as boolean device commands. Mode strings are passed through to the mode manager.
-	- Local sensors: PIR (security), DHT22 (environmental) when enabled and hardware is present.
-
-- Outputs:
-	- MQTT publications to Adafruit IO-style feeds via `send_to_adafruit_io` (environmental telemetry, security summaries, mode status, heartbeat).
-	- Device actuator changes (GPIO outputs for LEDs, fan, buzzer) via `device_control_module`.
-	- Local JSONL logs written per-day containing timestamped events, environmental readings, security events, mode, and actuator snapshot.
-	- Email alerts (SMTP) with optional image attachment for security motion events.
-
-- Error modes and behavior:
-	- Missing or invalid `config.json` causes `jeefHS.py` to raise a clear `RuntimeError` at startup; many modules provide fallbacks for sensor libraries but `security_module` requires a valid config with SMTP keys.
-	- MQTT failures are logged. `MQTT_communicator` attempts to maintain a connection and will report publish/subscribe errors.
-	- Sensor read failures: `environmental_module` retries DHT reads then falls back to simulated data. `security_module` writes placeholders if the camera capture fails.
-
----
-
-If you'd like, I can now:
-- add a `requirements.txt` with the minimal dependencies found in the code,
-- add a short example `config.example.json` that removes secrets and keeps placeholders,
-- or create a separate developer README for testing and unit tests.
-Tell me which you'd like next and I'll proceed.
-
-## What we learned
-
-Building JeefHS reinforced a few practical lessons about designing small IoT systems. First, modularity pays off: separating MQTT, device control, sensing, security, and mode management made it much easier to develop and test each area independently. Second, defensive programming and graceful fallbacks (simulated sensors, software GPIO stubs) are essential when hardware dependencies are unreliable or absent during development. Third, configuration should be explicit and validated early, mapping feed names, pins, and credentials in JSON made wiring the system straightforward but also highlighted the need to protect secrets. Fourth, a robust logging and local JSONL history proved invaluable for diagnosing intermittent network, sensor, or camera issues. Finally, simple UX choices, clear feed naming, concise mode semantics, and cooldowns for alerts, significantly reduce false positives and make the whole system easier to operate and extend.
+Milestone 3 highlighted the complexity of distributed systems and
+offline-first design. Separating the database synchronization into a
+background daemon thread was critical for system stability. The project
+also demonstrated how MQTT complements SQL by handling real-time control
+while SQL manages historical data. Finally, separating hardware logic
+from the Flask UI made development, testing, and deployment
+significantly easier.
